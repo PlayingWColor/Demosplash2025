@@ -6,6 +6,11 @@
 #define VK_EXT_DEBUG_REPORT_EXTENSION_NAME "VK_EXT_debug_report"
 #endif
 
+typedef struct QueueFamilyIndices {
+    uint32_t graphicsFamily;
+    bool isComplete;
+} QueueFamilyIndices;
+
 const char* const validationLayers[] = {
 	"VK_LAYER_KHRONOS_validation"
 };
@@ -23,14 +28,20 @@ void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT* create
 void SetupDebugMessenger();
 bool CheckValidationLayerSupport();
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData);
+void PickPhysicalDevice();
+bool IsDeviceSuitable(VkPhysicalDevice device);
+QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
 
 VkInstance instance;
 VkDebugUtilsMessengerEXT debugMessenger;
+VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+
 
 void InitializeVulkan(const char* appName)
 {
 	CreateInstance(appName);
 	SetupDebugMessenger();
+	PickPhysicalDevice();
 }
 
 void CleanUpVulkan()
@@ -104,11 +115,13 @@ void PopulateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT* create
         (*createInfo).messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
         (*createInfo).pfnUserCallback = DebugCallback;
 }
+
 static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageType, const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void* pUserData) {
         SDL_Log("VULKAN::validation layer: %s\n", pCallbackData->pMessage);
 
         return VK_FALSE;
 }
+
 void SetupDebugMessenger() {
 	if (!enableValidationLayers) return;
 
@@ -119,6 +132,56 @@ void SetupDebugMessenger() {
 		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "VULKAN::failed to set up debug messenger!\n");
 		exit(EXIT_FAILURE);
 	}
+}
+
+void PickPhysicalDevice() {
+	uint32_t deviceCount = 0;
+	vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+
+	if (deviceCount == 0) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "failed to find GPUs with Vulkan support!");
+		exit(EXIT_FAILURE);
+	}
+
+	VkPhysicalDevice devices[deviceCount];
+	vkEnumeratePhysicalDevices(instance, &deviceCount, devices);
+
+	for (int i = 0; i < deviceCount; i++) {
+		if (IsDeviceSuitable(devices[i])) {
+			physicalDevice = devices[i];
+			break;
+		}
+	}
+
+	if (physicalDevice == VK_NULL_HANDLE) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "failed to find a suitable GPU!");
+		exit(EXIT_FAILURE);
+	}
+}
+bool IsDeviceSuitable(VkPhysicalDevice device) {
+	QueueFamilyIndices indices = FindQueueFamilies(device);
+
+	return indices.isComplete;
+}
+
+QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device) {
+	QueueFamilyIndices indices;
+
+	uint32_t queueFamilyCount = 0;
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, nullptr);
+
+	VkQueueFamilyProperties queueFamilies[queueFamilyCount];
+	vkGetPhysicalDeviceQueueFamilyProperties(device, &queueFamilyCount, queueFamilies);
+
+	for (int i = 0; i < queueFamilyCount; i++) {
+		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
+			indices.graphicsFamily = i;
+			indices.isComplete = true;
+			break;
+		}
+	}
+
+	return indices;
 }
 
 bool CheckValidationLayerSupport() {
