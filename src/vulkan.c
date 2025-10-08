@@ -31,21 +31,26 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(VkDebugUtilsMessageSeverityF
 void PickPhysicalDevice();
 bool IsDeviceSuitable(VkPhysicalDevice device);
 QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
+void CreateLogicalDevice();
 
 VkInstance instance;
 VkDebugUtilsMessengerEXT debugMessenger;
 VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-
+VkDevice device;
+VkQueue graphicsQueue;
 
 void InitializeVulkan(const char* appName)
 {
 	CreateInstance(appName);
 	SetupDebugMessenger();
 	PickPhysicalDevice();
+	CreateLogicalDevice();
 }
 
 void CleanUpVulkan()
 {
+	vkDestroyDevice(device, nullptr);
+
 	if (enableValidationLayers) {
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
     }	
@@ -162,6 +167,43 @@ bool IsDeviceSuitable(VkPhysicalDevice device) {
 	QueueFamilyIndices indices = FindQueueFamilies(device);
 
 	return indices.isComplete;
+}
+void CreateLogicalDevice() {
+	QueueFamilyIndices indices = FindQueueFamilies(physicalDevice);
+
+	VkDeviceQueueCreateInfo queueCreateInfo = {};
+	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+	queueCreateInfo.queueFamilyIndex = indices.graphicsFamily;
+	queueCreateInfo.queueCount = 1;
+
+	float queuePriority = 1.0f;
+	queueCreateInfo.pQueuePriorities = &queuePriority;
+
+	VkPhysicalDeviceFeatures deviceFeatures = {};
+
+	VkDeviceCreateInfo createInfo = {};
+	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+	createInfo.pQueueCreateInfos = &queueCreateInfo;
+	createInfo.queueCreateInfoCount = 1;
+
+	createInfo.pEnabledFeatures = &deviceFeatures;
+
+	createInfo.enabledExtensionCount = 0;
+
+	if (enableValidationLayers) {
+		createInfo.enabledLayerCount = sizeof(validationLayers)/sizeof(validationLayers[0]);
+		createInfo.ppEnabledLayerNames = validationLayers;
+	} else {
+		createInfo.enabledLayerCount = 0;
+	}
+
+	if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "failed to create logical device!");
+		exit(EXIT_FAILURE);
+	}
+
+	vkGetDeviceQueue(device, indices.graphicsFamily, 0, &graphicsQueue);
 }
 
 QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device) {
