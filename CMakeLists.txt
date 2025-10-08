@@ -1,10 +1,16 @@
 cmake_minimum_required(VERSION 3.16)
 
+
 set( CMAKE_C_COMPILER "gcc" )
 
 project(PwCDemoSplash2025 LANGUAGES C VERSION 3.16)
 
-set(CMAKE_C_STANDARD 99)
+set(VULKAN_FOLDER "1.4.328.0")
+set(ENV{VULKAN_SDK} "C:/VulkanSDK/${VULKAN_FOLDER}")
+
+find_package(Vulkan REQUIRED)
+
+set(CMAKE_C_STANDARD 23)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
 if (UNIX)
@@ -20,6 +26,13 @@ include_directories(
         libs/SDL/include
 )
 
-add_executable(${PROJECT_NAME} src/main.c ${LIBRARIES})
+set(SRC
+		src/main.c
+		src/vulkan.c
+		src/vulkan.h
+)
 
-target_link_libraries(${PROJECT_NAME} SDL3::SDL3)
+add_executable(${PROJECT_NAME} ${SRC} ${LIBRARIES})
+
+target_include_directories(${PROJECT_NAME} PUBLIC "${VULKAN_SDK}/Include")
+target_link_libraries(${PROJECT_NAME} PRIVATE Vulkan::Vulkan SDL3::SDL3)
