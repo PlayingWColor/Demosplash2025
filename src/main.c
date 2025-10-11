@@ -33,7 +33,7 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	
-	InitializeVulkan(TITLE);
+	InitializeVulkan(TITLE, window);
 
 	//Main Loop
 

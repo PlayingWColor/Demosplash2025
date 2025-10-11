@@ -8,8 +8,25 @@
 
 typedef struct QueueFamilyIndices {
     uint32_t graphicsFamily;
-    bool isComplete;
+    uint32_t presentFamily;
+	bool hasGraphicsFamilyValue;
+	bool hasPresentFamilyValue;
 } QueueFamilyIndices;
+
+const int QueueFamilyIndicesCount = 2;
+
+bool QueueFamilyIndices_IsComplete(QueueFamilyIndices* instance) {
+	return (*instance).hasGraphicsFamilyValue && (*instance).hasPresentFamilyValue;
+}
+
+int QueueFamilyIndices_GetAt(QueueFamilyIndices* instance, int index) {
+	switch (index)
+	{
+		case 0 : return (*instance).graphicsFamily;
+		case 1 : return (*instance).presentFamily;
+		default : return (uint32_t)(-1);
+	}
+}
 
 const char* const validationLayers[] = {
 	"VK_LAYER_KHRONOS_validation"
@@ -32,17 +49,22 @@ void PickPhysicalDevice();
 bool IsDeviceSuitable(VkPhysicalDevice device);
 QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device);
 void CreateLogicalDevice();
+void CreateSurface(SDL_Window* window);
+uint32_t* GetUniqueQueueFamilies(QueueFamilyIndices* indices, int *uniqueCount);
 
 VkInstance instance;
 VkDebugUtilsMessengerEXT debugMessenger;
 VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
 VkDevice device;
 VkQueue graphicsQueue;
+VkSurfaceKHR surface;
+VkQueue presentQueue;
 
-void InitializeVulkan(const char* appName)
+void InitializeVulkan(const char* appName, SDL_Window* window)
 {
 	CreateInstance(appName);
 	SetupDebugMessenger();
+	CreateSurface(window);
 	PickPhysicalDevice();
 	CreateLogicalDevice();
 }
@@ -53,7 +75,9 @@ void CleanUpVulkan()
 
 	if (enableValidationLayers) {
 		DestroyDebugUtilsMessengerEXT(instance, debugMessenger, nullptr);
-    }	
+    }
+	
+	vkDestroySurfaceKHR(instance, surface, nullptr);
 	vkDestroyInstance(instance, nullptr);
 }
 
@@ -139,12 +163,19 @@ void SetupDebugMessenger() {
 	}
 }
 
+void CreateSurface(SDL_Window* window) {
+	if (SDL_Vulkan_CreateSurface(window, instance, nullptr, &surface) != true) {
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "VULKAN::failed to create window surface!\n");
+		exit(EXIT_FAILURE);
+	}
+}
+
 void PickPhysicalDevice() {
 	uint32_t deviceCount = 0;
 	vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
 	if (deviceCount == 0) {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "failed to find GPUs with Vulkan support!");
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "VULKAN::failed to find GPUs with Vulkan support!");
 		exit(EXIT_FAILURE);
 	}
 
@@ -159,33 +190,41 @@ void PickPhysicalDevice() {
 	}
 
 	if (physicalDevice == VK_NULL_HANDLE) {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "failed to find a suitable GPU!");
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "VULKAN::failed to find a suitable GPU!");
 		exit(EXIT_FAILURE);
 	}
 }
 bool IsDeviceSuitable(VkPhysicalDevice device) {
 	QueueFamilyIndices indices = FindQueueFamilies(device);
 
-	return indices.isComplete;
+	return QueueFamilyIndices_IsComplete(&indices);
 }
 void CreateLogicalDevice() {
 	QueueFamilyIndices indices = FindQueueFamilies(physicalDevice);
 
-	VkDeviceQueueCreateInfo queueCreateInfo = {};
-	queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-	queueCreateInfo.queueFamilyIndex = indices.graphicsFamily;
-	queueCreateInfo.queueCount = 1;
+	VkDeviceQueueCreateInfo queueCreateInfos[QueueFamilyIndicesCount] = {};
+	
+	int uniqueQueueFamilyCount = 0;
+	uint32_t* uniqueQueueFamilies = GetUniqueQueueFamilies(&indices, &uniqueQueueFamilyCount);
+
+	SDL_Log("VULKAN::Unique Queue Family Count : %d\n", uniqueQueueFamilyCount);
 
 	float queuePriority = 1.0f;
-	queueCreateInfo.pQueuePriorities = &queuePriority;
+	for(int i = 0; i < uniqueQueueFamilyCount; i++)
+	{
+		queueCreateInfos[i].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+		queueCreateInfos[i].queueFamilyIndex = uniqueQueueFamilies[i];
+		queueCreateInfos[i].queueCount = 1;
+		queueCreateInfos[i].pQueuePriorities = &queuePriority;
+	}
 
 	VkPhysicalDeviceFeatures deviceFeatures = {};
 
 	VkDeviceCreateInfo createInfo = {};
 	createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 
-	createInfo.pQueueCreateInfos = &queueCreateInfo;
-	createInfo.queueCreateInfoCount = 1;
+	createInfo.pQueueCreateInfos = queueCreateInfos;
+	createInfo.queueCreateInfoCount = uniqueQueueFamilyCount;
 
 	createInfo.pEnabledFeatures = &deviceFeatures;
 
@@ -199,11 +238,12 @@ void CreateLogicalDevice() {
 	}
 
 	if (vkCreateDevice(physicalDevice, &createInfo, nullptr, &device) != VK_SUCCESS) {
-		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "failed to create logical device!");
+		SDL_LogError(SDL_LOG_CATEGORY_ERROR, "VULKAN::failed to create logical device!");
 		exit(EXIT_FAILURE);
 	}
 
 	vkGetDeviceQueue(device, indices.graphicsFamily, 0, &graphicsQueue);
+	vkGetDeviceQueue(device, indices.presentFamily, 0, &presentQueue);
 }
 
 QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device) {
@@ -218,12 +258,46 @@ QueueFamilyIndices FindQueueFamilies(VkPhysicalDevice device) {
 	for (int i = 0; i < queueFamilyCount; i++) {
 		if (queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) {
 			indices.graphicsFamily = i;
-			indices.isComplete = true;
+			indices.hasGraphicsFamilyValue = true;
+		}
+
+		VkBool32 presentSupport = false;
+		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface, &presentSupport);
+
+		if (presentSupport) {
+			indices.presentFamily = i;
+			indices.hasPresentFamilyValue = true;
+		}
+
+		if (QueueFamilyIndices_IsComplete(&indices)) {
 			break;
 		}
 	}
 
 	return indices;
+}
+
+uint32_t* GetUniqueQueueFamilies(QueueFamilyIndices* indices, int *uniqueCount)
+{
+	uint32_t* unique = (uint32_t*)malloc(QueueFamilyIndicesCount * sizeof(uint32_t));
+
+	for (int i = 0; i < QueueFamilyIndicesCount; i++)
+	{
+		bool isUnique = true;
+
+		for (int j = 0; j < i; j++)
+		{
+			if (QueueFamilyIndices_GetAt(indices, i) == QueueFamilyIndices_GetAt(indices, j))
+			{
+				isUnique = false;
+				break;
+			}
+		}
+
+		if (isUnique)
+			unique[(*uniqueCount)++] = QueueFamilyIndices_GetAt(indices, i);
+	}
+	return unique;
 }
 
 bool CheckValidationLayerSupport() {

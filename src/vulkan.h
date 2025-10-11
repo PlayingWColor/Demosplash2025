@@ -12,7 +12,7 @@
 #include <SDL3/SDL_vulkan.h>
 #endif
 
-void InitializeVulkan(const char* appName);
+void InitializeVulkan(const char* appName, SDL_Window* window);
 
 void CleanUpVulkan();
 
