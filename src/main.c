@@ -10,8 +10,8 @@
 
 #include "vulkan.h"
 
-#define SCREEN_WIDTH 1920
-#define SCREEN_HEIGHT 1080
+#define SCREEN_WIDTH 800
+#define SCREEN_HEIGHT 480
 #define TITLE "Playing with Color - Demosplash 2025"
 
 int main(int argc, char* argv[])
@@ -44,6 +44,7 @@ int main(int argc, char* argv[])
 			if (event.type == SDL_EVENT_QUIT || (event.type == SDL_EVENT_KEY_UP && event.key.key == SDLK_ESCAPE)) {
 				shouldClose = true;
 			}
+			DrawFrame();
 		}
 
 	}

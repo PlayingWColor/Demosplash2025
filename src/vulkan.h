@@ -14,6 +14,8 @@
 
 void InitializeVulkan(const char* appName, SDL_Window* window);
 
+void DrawFrame();
+
 void CleanUpVulkan();
 
 #endif
