@@ -9,22 +9,30 @@
 #endif
 
 #include "vulkan.h"
+#include "music.h"
+#include "cglm/cglm.h"
 
-#define SCREEN_WIDTH 800
-#define SCREEN_HEIGHT 480
+#define SCREEN_WIDTH 1920
+#define SCREEN_HEIGHT 1080
 #define TITLE "Playing with Color - Demosplash 2025"
+
+const char* musicFile = "../assets/music.wav";
 
 int main(int argc, char* argv[])
 {
+	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO);
+
+	//Load Music
+	LoadMusic(musicFile);
+
 	//Create Window for Vulkan Usage
 	
 	SDL_Window* window;
-	SDL_Init(SDL_INIT_VIDEO);
 	
 	bool shouldClose = false;
 
 	window = SDL_CreateWindow(
-		TITLE, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_VULKAN
+		TITLE, SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_VULKAN | SDL_WINDOW_FULLSCREEN
 	);
 	
 	if (window == NULL)
@@ -34,23 +42,28 @@ int main(int argc, char* argv[])
 	}
 	
 	InitializeVulkan(TITLE, window);
+	
+	BeginPlayMusic();
 
 	//Main Loop
-
 	while(!shouldClose) {
+		if(SDL_GetTicks() > 5000)
+			FrameUpdateMusic();
+
 		SDL_Event event;
 		
 		while (SDL_PollEvent(&event)) {
 			if (event.type == SDL_EVENT_QUIT || (event.type == SDL_EVENT_KEY_UP && event.key.key == SDLK_ESCAPE)) {
 				shouldClose = true;
 			}
-			DrawFrame();
 		}
+		DrawFrame();
 
 	}
 	
 	//Close Application
-	
+	CloseMusic();
+
 	CleanUpVulkan();
 
 	SDL_DestroyWindow(window);

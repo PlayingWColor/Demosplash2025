@@ -24,12 +24,15 @@ add_subdirectory(libs/SDL EXCLUDE_FROM_ALL)
 include_directories(
         src
         libs/SDL/include
+		libs/cglm/include
 )
 
 set(SRC
 		src/main.c
 		src/vulkan.c
 		src/vulkan.h
+		src/music.c
+		src/music.h
 )
 
 add_executable(${PROJECT_NAME} ${SRC} ${LIBRARIES})
