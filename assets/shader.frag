@@ -10,12 +10,11 @@ layout(location = 0) out vec3 outColor;
 
 const vec2 viewportSize = vec2(1920.0,1080.0);
 
-const float MAX_MARCH_DIS = 100.0;
+const float MAX_MARCH_DIS = 15.0;
 const int MAX_MARCH_STEPS = 256;
-const int CLOUD_RESOLUTION = 64;
 
-const float REFL_MAX_MARCH_DIS = 50.0;
-const int REFL_MAX_MARCH_STEPS = 16;
+const float REFL_MAX_MARCH_DIS = 5.0;
+const int REFL_MAX_MARCH_STEPS = 8;
 const int REFL_MAX = 1;
 const int REFL_ITER = 32;
 
@@ -170,18 +169,23 @@ float infinitePlane(vec3 position, float height)
 {
 	return position.y - height;
 }
-SurfaceData Part0AlienOrb(in vec3 rayPos)
+SurfaceData Part0Sphere(in vec3 rayPos, float timeOffset)
 {
-	vec3 pos = vec3(0.0,-0.5,-20.0 + uniforms.time.z);
+	vec3 offsetPos = rayPos + vec3(timeOffset + uniforms.time.y,0.0,0.0);
 	
+	vec3 spacing = vec3(4.0);
+
+	vec3 spheres = round(offsetPos/spacing);
+	spheres = offsetPos - spacing * spheres;
+
 	//float displacement = cloud(vec3(rayPos * 2.0 + uniforms.time.w * 1.0))*1.0 + sin(rayPos.y * 20.0 - uniforms.time.w * 10.0) * 0.5;
 	float displacement = cloud(vec3(rayPos.x + uniforms.time.x * 0.2, rayPos.y + uniforms.time.x * 0.5, rayPos.z + uniforms.time.x * 1.0));//sin(rayPos.y * 5.0 + uniforms.time.z);
 
 	SurfaceData result;
 
-	result.dis = sphere(pos + rayPos, 0.5) + displacement * 0.55;
-	result.col = vec3(0.2,0.7,0.8);
-	result.emit = clamp(-0.2 + displacement,0.5,1.0);
+	result.dis = sphere(spheres, 0.5) + displacement * mix(10,0.55,clamp((uniforms.time.y - timeOffset) * 0.1,0.0,1.0));
+	result.col = mix(vec3(0.9,0.1,0.2),vec3(0.8,0.7,0.0),cloud(rayPos));
+	result.emit = 1.0;
 	result.shine = 0.95;
 	result.metal = 0.0;
 
@@ -207,37 +211,26 @@ vec3 dancingOctahedron(vec3 rayPos, float timeOffset)
 
 	return rotRayPos;
 }
-SurfaceData Part1DancingOctohedrons(in vec3 rayPos, in float timeOffset)
+SurfaceData Part1Shower(in vec3 rayPos, in float timeOffset)
 {
-	vec3 rotRayPos0 = dancingOctahedron(rayPos, -timeOffset + 0.0);
-	vec3 rotRayPos1 = dancingOctahedron(rayPos, -timeOffset - 1.5);
-	vec3 rotRayPos2 = dancingOctahedron(rayPos, -timeOffset - 3.0);
-	vec3 rotRayPos3 = dancingOctahedron(rayPos, -timeOffset - 4.5);
+	float showerTime = uniforms.time.x + timeOffset;
 	
+	vec3 offsetPos = rayPos + vec3(2.0,showerTime * 10,2.0);
+
+	float displacement = cloud(vec3(rayPos.x + showerTime * 2, rayPos.y + showerTime * 5, rayPos.z + showerTime * 3.0));
+
+	const vec3 spacing = vec3(1.0, 0.2, 1.0);
+
+	vec3 cubes = round(offsetPos/spacing);
+	cubes = offsetPos - spacing * cubes;
+
 	SurfaceData result;
-	SurfaceData result1;
-	SurfaceData result2;
-	SurfaceData result3;
-
-	result.dis = octahedron(rotRayPos0, 0.125);
-	result.col = vec3(0.9,0.1,0.1);
+	result.col = HUEtoRGB(cloud(rayPos * 10.0)) * 1.2;
 	
-	result1.dis = octahedron(rotRayPos1, 0.125);
-	result1.col = vec3(0.1,0.9,0.1);
-
-	result2.dis = octahedron(rotRayPos2, 0.125);
-	result2.col = vec3(0.1,0.1,0.9);
-
-	result3.dis = octahedron(rotRayPos3, 0.125);
-	result3.col = vec3(0.9,0.9,0.9);
-
-	result = closest(result, result1);
-	result = closest(result, result2);
-	result = closest(result, result3);
-
-	result.emit = 0.05;
-	result.shine = 0.98;
-	result.metal = 1.0;
+	result.dis = cube(cubes, vec3(0.1)) + displacement * mix(10,0.25,clamp((uniforms.time.y-timeOffset)*0.075,0.0,1.0));
+	result.emit = 0.95;
+	result.shine = 0.0;
+	result.metal = 0.0;
 
 	return result;
 }
@@ -373,51 +366,69 @@ SurfaceData Part4TrippyEffects(in vec3 rayPos, float timeOffset)
 {
 	SurfaceData result;
 
-	vec3 tripRayPos = mix(rayPos,vec3(sin(rayPos.x),sin(rayPos.y),1.0),clamp((uniforms.time.y-timeOffset-10)*0.01,0.0,1.0));
+	vec3 tripRayPos = mix(rayPos,vec3(sin(rayPos.x),1.0,sin(rayPos.z)),uniforms.time.y*0.001);
 
-	float displacement = cloud(vec3(tripRayPos.x + uniforms.time.x * 2.2, tripRayPos.y + uniforms.time.x * 5.5, tripRayPos.z + uniforms.time.x * 10.0));//sin(tripRayPos.y * 5.0 + uniforms.time.z);
-	float displacement1 = sin(tripRayPos.y * 5.0 + uniforms.time.y) * 0.5 - cos(tripRayPos.x * 12.5 + uniforms.time.y * 1.4) * 0.25 + displacement * 0.5;
-	float displacement2 = sin(tripRayPos.x*0.13 * uniforms.time.w) + sin(tripRayPos.y*0.4 * uniforms.time.z) + sin(tripRayPos.z*0.2 * uniforms.time.y);
+	tripRayPos = rotateX(tripRayPos, 1.0, vec3(0.0,0.0,0.0));
+
+	float displacement2 = sin(tripRayPos.x*4 * uniforms.time.w) + sin(tripRayPos.y*2 * uniforms.time.z) + sin(tripRayPos.z*0.5 * uniforms.time.y);
 
 	float clouds = cloud(tripRayPos);
 	
 	float cloudsExp = min(2*pow(clouds,3.0),1.0);
 
-	result.dis = cube(tripRayPos - vec3(0.0,0.0,10.0),vec3(14.0,8.0,1.0)) - displacement * 3.0;
-	result.col = mix(vec3(0.1),vec3(0.9),cloudsExp);
-	result.emit = cloudsExp;
+	result.dis = cube(tripRayPos - vec3(0.0,7.0 - sin(uniforms.time.x - timeOffset*0.05)*2.5,0.0), vec3(20.0,3.0,20.0)) - displacement2;
+	result.col = mix(vec3(0.4),vec3(0.9),cloudsExp);
+	result.emit = 0.9;
 	result.shine = 0.0;
 	result.metal = 0.0;
 	
-	SurfaceData result1;
-	
-	result1.dis = cube(tripRayPos - vec3(0.0,0.0,15.0), vec3(14.0,8.0,1.0)) - displacement1 * 10.0;
-	result1.col = mix(HUEtoRGB(mod((uniforms.time.y+tripRayPos.x)*0.01,1.0))+0.5,HUEtoRGB(mod((uniforms.time.y+tripRayPos.x)*0.01,1.0))+0.5,cloudsExp + sin(tripRayPos.x) * 0.1) * 1.0;
-	result1.emit = 0.2;
-	result1.shine = 0.0;
-	result1.metal = 0.0;
-	
-	SurfaceData result2;
+	return result;//closest(closest(result,result1),result2);
+}
 
-	result2.dis = cube(tripRayPos - vec3(0.0,0.0,20.0 - sin(uniforms.time.x - timeOffset*0.05)*25), vec3(14.0,8.0,1.0)) - displacement2;
-	result2.col = mix(vec3(0.1,0.4,0.8),vec3(0.8,0.4,0.1),tripRayPos.z*0.6) * 2.0;
-	result2.emit = 0.1;
-	result2.shine = 0.0;
-	result2.metal = 0.0;
+SurfaceData Part5TrippyEffects(in vec3 rayPos, float timeOffset)
+{
+	SurfaceData result;
 
-	return closest(closest(result,result1),result2);
+	vec3 tripRayPos = mix(rayPos,vec3(sin(rayPos.x),1.0,sin(rayPos.z)),uniforms.time.y*0.001);
+
+	tripRayPos = rotateZ(tripRayPos, -0.9, vec3(0.0,0.0,0.0));
+	tripRayPos = rotateX(tripRayPos, 0.9, vec3(0.0,0.0,0.0));
+
+	float displacement2 = sin(tripRayPos.x*0.4 * uniforms.time.w) + sin(tripRayPos.y*0.05 * uniforms.time.z) + sin(tripRayPos.z*0.2 * uniforms.time.y);
+
+	float clouds = cloud(tripRayPos);
+	float cloudsCol = cloud(rayPos);
+	
+	float cloudsExp = min(2*pow(clouds,3.0),1.0);
+	
+	float offAmount = clamp(uniforms.time.y-85,0.0,1.0);
+	float offPos = mix(6.0,3.0,offAmount);
+	float offEmit = mix(0.2,0.9,offAmount);
+
+	result.dis = cube(tripRayPos - vec3(0.0,offPos - sin(uniforms.time.x - timeOffset*0.05)*2.5,0.0), vec3(20.0,3.0,20.0)) - displacement2;
+	result.col = vec3(1.0,0.2,0.3);
+	result.emit = offEmit;
+	result.shine = 0.0;
+	result.metal = 0.0;
+	
+	return result;//closest(closest(result,result1),result2);
 }
 SurfaceData surfaceComposite(in vec3 rayPos)
 {
-	SurfaceData result = Part0AlienOrb(rayPos); 
-	if(uniforms.time.y > 12.0 && uniforms.time.y < 47.0)
-		result = closest(result, Part1DancingOctohedrons(rayPos, 12.0));
-	if(uniforms.time.y > 40.0 && uniforms.time.y < 72.0)
-		result = closest(result, Part2Kaleidoscope(rayPos, 45.0));
+	vec3 tripRayPos = mix(rayPos,vec3(sin(rayPos.x),1.0,sin(rayPos.z)),clamp((uniforms.time.y-95)*0.15,0.0,1.0));
+
+	//SurfaceData result = Part0Sphere(rayPos,0.0);
+	//SurfaceData result = Part1Shower(rayPos,0.0);
+	SurfaceData result = closest(Part4TrippyEffects(tripRayPos,0.0),Part5TrippyEffects(tripRayPos,15.0));
+	 
+	if(uniforms.time.y > 12.0)
+		result = closest(result, Part1Shower(tripRayPos, 12.0));
+	if(uniforms.time.y > 40.0)
+		result = closest(result, Part0Sphere(tripRayPos, 40.0));/*
 	if(uniforms.time.y > 70.0 && uniforms.time.y < 102.0)
 		result = closest(result, Part3CubeOcean(rayPos, 75.0));
 	if(uniforms.time.y >	102.0)
-		result = closest(result, Part4TrippyEffects(rayPos, 102.0));
+		result = closest(result, Part4TrippyEffects(rayPos, 102.0));*/
 	return result;
 }
 VolumeData skyClouds(in vec3 rayPos)
@@ -464,7 +475,7 @@ vec3 calcNormal(in vec3 position)
 					)
 				);
 }
-vec3 world0space(in vec3 skyPos)
+vec3 world0black(in vec3 skyPos)
 {
 	skyPos = rotateZ(skyPos, uniforms.time.x, vec3(0));
 
@@ -479,7 +490,7 @@ vec3 world0space(in vec3 skyPos)
 
 	vec3 colorStars = stars * 0.5 + stars * abs(skyPos);
 
-	return max(background + clouds + stars,0.0); 
+	return vec3(0.1,0.1,0.15);//max(background + clouds + stars,0.0); 
 }
 vec3 world1kaleidoscope(in vec3 skyPos)
 {
@@ -508,7 +519,7 @@ vec3 worldComposite(in vec3 skyPos)
 	float firstTrans = clamp(uniforms.time.y-70-skyPos.y,0.0,1.0);
 	float secondTrans = clamp(uniforms.time.y-102,0.0,1.0);
 
-	return mix(mix(world0space(skyPos),world2sky(skyPos-vec3(0.0,firstTrans-1.0,0.0)), firstTrans),world3sky(skyPos),secondTrans);
+	return mix(mix(world0black(skyPos),world2sky(skyPos-vec3(0.0,firstTrans-1.0,0.0)), firstTrans),world3sky(skyPos),secondTrans);
 }
 void main()
 {
@@ -516,8 +527,8 @@ void main()
 
     vec2 scaledUV = vec2((screenUV.x - 0.5) * aspect, screenUV.y - 0.5) * 2.0; 
 
-    vec3 rayOrigin = vec3(0.0,0.0,0.0);
-    vec3 rayDir = normalize(vec3(scaledUV,1.0));
+    vec3 rayOrigin = rotateY(vec3(0.0,0.0,-3.0), uniforms.time.x * 1.5, vec3(0.0,0.0,0.0));
+    vec3 rayDir = rotateY(normalize(vec3(scaledUV,1.0)), uniforms.time.x * 1.5, vec3(0.0,0.0,0.0));
   	//rayDir = rotateX(rayDir, 0.7, rayOrigin);
 
 
@@ -540,31 +551,6 @@ void main()
             break;
     }
 
-#ifdef RENDER_VOLUME
-
-	VolumeData volumeResult;
-	volumeResult.col = vec4(0.0);
-	volumeResult.density = 0.0;
-	volumeResult.absorb = 0.0;
-	const float volumeStep = 0.5;
-	int stepCount = 0;
-    //volumes
-    for(float vDis = 0.0; vDis < totalResult.dis; vDis += volumeStep)
-    {
-        vec3 rayPos = rayOrigin + rayDir * vDis;
-
-        VolumeData result = volumeComposite(rayPos);
-        volumeResult.density += result.density * volumeStep;
-        volumeResult.absorb += result.absorb * volumeStep;
-		volumeResult.col += result.col;
-
-		stepCount++;
-    }
-	volumeResult.col /= stepCount;
-	volumeResult.col.a *= volumeResult.density;
-
-#endif
-    
 	vec3 rayPos = rayOrigin + rayDir * totalResult.dis;
     vec3 normal = calcNormal(rayPos);
     vec3 reflectRayDir = reflect(rayDir, normal);
@@ -581,7 +567,7 @@ void main()
 
 	if (totalResult.dis >= MAX_MARCH_DIS)
     {
-        outColor = worldComposite(rayDir); 
+        outColor = world0black(rayDir); 
     }
     else
     {
@@ -590,7 +576,7 @@ void main()
 		
 		float fresnel = clamp(dot(normal, vec3(0.0,0.0,1.0)),0.0,1.0);
 		float roughness = totalRough * 0.5 * mix(1.0-fresnel, 1.0, totalResult.metal);
-		for(int i = 0; i < REFL_ITER; i++)
+		for (int i = 0; i < REFL_ITER; i++)
 		{
 			reflectRayDir = mix(reflectRayDir,noise3D(reflectRayDir * (1000 + i * 11)), roughness);
 #ifdef SELF_REFLECT 
@@ -621,7 +607,7 @@ void main()
 			}
 #endif
 			{			
-				worldReflect += reflectResult.col * worldComposite(reflectRayDir); 
+				worldReflect += reflectResult.col * world3sky(reflectRayDir); 
 			}
 		}
 
@@ -640,26 +626,16 @@ void main()
 		//outColor = reflectCol;
 
 		vec3 finalColor = mix(vec3(totalResult.col),vec3(1.0),fresnel);
-        finalColor *= totalResult.emit + specular + reflectCol + lambert * (1.0-totalResult.metal);// + vec3(0.01,0.01,0.01);
+        finalColor *= totalResult.emit + reflectCol * (1.0-totalResult.metal);// + vec3(0.01,0.01,0.01);
 		finalColor += clamp(reflectCol - 0.75,0.0,1.0);
 		outColor = finalColor;
 		//outColor = fresnel;
 
 	}
-#ifdef RENDER_VOLUME
-	//apply volume to outColor
-	{
-		//vec3 normal = rayDir;
-		//float lambert = clamp(dot(normal, sun), 0.0,1.0);
-		vec3 fakeIndirect = world2sky(vec3(0.0,1.0,0.0));
-		//vec3 subsurface = clamp(vec3(dot(-normal, sun)) - vec3(volumeResult.absorb), vec3(0.0),vec3(1.0));
-
-		outColor = mix(outColor, mix(volumeResult.col.rgb + fakeIndirect,vec3(0.0,0.2,0.4),clamp(volumeResult.absorb,0.0,1.0)), clamp(volumeResult.col.a,0.0,1.0));
-	}
-#endif
 	//fade to and from black
 	{
 		outColor = mix(vec3(0.0), outColor, sCurve(clamp((uniforms.time.y-2.0)*0.4,0.0,1.0)));
+		outColor = mix(outColor, vec3(1.0), sCurve(clamp((uniforms.time.y-135.0)*0.4,0.0,1.0)));
 	}
 	//gamma correction
 	outColor = pow(outColor, vec3(2.2));

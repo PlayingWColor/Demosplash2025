@@ -14,7 +14,7 @@
 
 #define SCREEN_WIDTH 1920
 #define SCREEN_HEIGHT 1080
-#define TITLE "Playing with Color - Demosplash 2025"
+#define TITLE "Playing with Color - Unrequited Anxiety"
 
 const char* musicFile = "../assets/music.wav";
 
@@ -44,10 +44,12 @@ int main(int argc, char* argv[])
 	InitializeVulkan(TITLE, window);
 	
 	BeginPlayMusic();
+	
+	int lastTime = 0;
 
 	//Main Loop
 	while(!shouldClose) {
-		if(SDL_GetTicks() > 5000)
+		if(SDL_GetTicks() > 2000)
 			FrameUpdateMusic();
 
 		SDL_Event event;
@@ -58,6 +60,14 @@ int main(int argc, char* argv[])
 			}
 		}
 		DrawFrame();
+		
+		if(SDL_GetTicks() * 0.001 >= lastTime + 1)
+		{
+			lastTime = SDL_GetTicks() * 0.001;
+			SDL_Log("Seconds : %d\n", lastTime);
+		}
+		if(lastTime >= 140)
+			break;
 
 	}
 	
